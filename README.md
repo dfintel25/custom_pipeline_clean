@@ -91,6 +91,9 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install kafka-python
 pip install streamlit pandas matplotlib
+pip install seaborn
+pip install matplotlib
+pip install streamlit-autorefresh
 ```
 To run the Producer:
 ```
