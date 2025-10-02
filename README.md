@@ -2,7 +2,7 @@
 #### Developer: Derek Fintel
 #### Contact: s542635@youremail; 555-abc-1234
 
-## Custome Pipleline Overview
+## Custom Pipleline Overview
 This project builds upon a prior assignment that streamed data from a producer to a consumer and transformed the data through a duckDB OLAP and exported to CSV. 
 
 For this project, we're going to use the distribution of working programs and modify them towards a new use-case and data source. 
@@ -106,8 +106,9 @@ source .venv/bin/activate
 python3 -m consumers.sqlite_consumer_case_newTable
 ```
 
-(WSL) To run the visualize script:
+To run the visualize script:
 ```
+bash- wsl
 python3 -m venv .venv
 source .venv/bin/activate
 python3 visualize_sales.py
