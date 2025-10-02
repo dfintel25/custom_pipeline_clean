@@ -84,7 +84,7 @@ scripts/prepare_kafka.sh
 cd ~/kafka
 bin/kafka-server-start.sh config/kraft/server.properties
 ```
-You may need to install these packages in each WSL terminals to run the producer, consumer, and visualizations scripts:
+You will need to install these packages in each WSL terminals to run the producer, consumer, and visualizations scripts. A potential total of 4, all with their individual setup prompts from below:
 ```
 python3 -m venv .venv
 source .venv/bin/activate
@@ -110,11 +110,14 @@ source .venv/bin/activate
 python3 -m consumers.sqlite_consumer_case_newTable
 ```
 
-To run the visualize script:
+To run the visualize scripts:
 ```
 bash- wsl
 python3 -m venv .venv
 source .venv/bin/activate
+(static)
 python3 visualizations.visualize_sales.py
+-or-
+(dynamic)
 streamlit run visualizations/live_sales_dashboard.py
 ```
