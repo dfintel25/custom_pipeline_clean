@@ -1,0 +1,132 @@
+import json
+import pathlib
+import sqlite3
+import time
+from kafka import KafkaConsumer
+
+import utils.utils_config as config
+from utils.utils_logger import logger
+
+#####################################
+# Initialize SQLite Table
+#####################################
+def init_db(db_path: pathlib.Path, table_name: str = "coffee_sales"):
+    logger.info(f"Initializing SQLite table '{table_name}' at {db_path}")
+    try:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    message TEXT,
+                    author TEXT,
+                    timestamp TEXT,
+                    category TEXT,
+                    sentiment REAL,
+                    keyword_mentioned TEXT,
+                    message_length INTEGER,
+                    hour_of_day INTEGER,
+                    cash_type TEXT,
+                    Time_of_Day TEXT,
+                    Weekday TEXT,
+                    Month_name TEXT,
+                    Date TEXT,
+                    Time TEXT
+                )
+                """
+            )
+            conn.commit()
+        logger.info(f"Table '{table_name}' ready.")
+    except Exception as e:
+        logger.error(f"Failed to initialize table '{table_name}': {e}")
+
+
+#####################################
+# Insert Message into SQLite
+#####################################
+def insert_message(message: dict, db_path: pathlib.Path, table_name: str = "coffee_sales"):
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {table_name} (
+                    message, author, timestamp, category, sentiment, keyword_mentioned,
+                    message_length, hour_of_day, cash_type, Time_of_Day, Weekday,
+                    Month_name, Date, Time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    message.get("message"),
+                    message.get("author"),
+                    message.get("timestamp"),
+                    message.get("category"),
+                    message.get("sentiment"),
+                    message.get("keyword_mentioned"),
+                    message.get("message_length"),
+                    message.get("hour_of_day"),
+                    message.get("cash_type"),
+                    message.get("Time_of_Day"),
+                    message.get("Weekday"),
+                    message.get("Month_name"),
+                    message.get("Date"),
+                    message.get("Time"),
+                )
+            )
+            conn.commit()
+        logger.info(f"Inserted coffee message: {message.get('message')}")
+    except Exception as e:
+        logger.error(f"Failed to insert message: {e}")
+
+
+#####################################
+# Main Consumer Loop
+#####################################
+def main():
+    logger.info("Starting continuous SQLite consumer for coffee messages.")
+
+    buzz_sqlite: pathlib.Path = config.get_sqlite_path()
+    TABLE_NAME = "coffee_sales"
+
+    # Init table
+    init_db(buzz_sqlite, table_name=TABLE_NAME)
+
+    # Setup Kafka Consumer
+    kafka_broker = config.get_kafka_broker_address()
+    kafka_topic = config.get_kafka_topic()
+    consumer = KafkaConsumer(
+        kafka_topic,
+        bootstrap_servers=[kafka_broker],
+        auto_offset_reset="earliest",
+        enable_auto_commit=True,
+        group_id="sqlite_coffee_consumer",
+        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+    )
+    logger.info(f"Kafka consumer subscribed to topic '{kafka_topic}' on {kafka_broker}")
+
+    coffee_keywords = ["coffee", "espresso", "latte", "cappuccino", "americano", "cortado"]
+
+    try:
+        for msg in consumer:
+            message = msg.value
+            # Filter only coffee messages
+            if message.get("category") == "beverage" and any(
+                kw in message.get("message", "").lower() for kw in coffee_keywords
+            ):
+                logger.info(f"Coffee message found: {message}")
+                insert_message(message, buzz_sqlite, table_name=TABLE_NAME)
+            # Respect message interval
+            time.sleep(config.get_message_interval_seconds_as_int())
+    except KeyboardInterrupt:
+        logger.warning("Consumer interrupted by user.")
+    except Exception as e:
+        logger.error(f"Unexpected error in consumer: {e}")
+    finally:
+        consumer.close()
+        logger.info("Kafka consumer closed.")
+
+
+if __name__ == "__main__":
+    main()
