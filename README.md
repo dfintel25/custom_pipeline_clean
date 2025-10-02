@@ -90,6 +90,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install kafka-python
+pip install streamlit pandas matplotlib
 ```
 To run the Producer:
 ```
@@ -111,5 +112,6 @@ To run the visualize script:
 bash- wsl
 python3 -m venv .venv
 source .venv/bin/activate
-python3 visualize_sales.py
+python3 visualizations.visualize_sales.py
+streamlit run visualizations/live_sales_dashboard.py
 ```

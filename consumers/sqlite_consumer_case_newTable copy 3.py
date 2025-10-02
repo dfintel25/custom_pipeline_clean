@@ -2,7 +2,6 @@ import json
 import pathlib
 import sqlite3
 import time
-import re
 from kafka import KafkaConsumer
 
 import utils.utils_config as config
@@ -20,7 +19,7 @@ def init_db(db_path: pathlib.Path, table_name: str = "coffee_sales"):
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             
-            # Create table if it doesn't exist (original + sales column)
+            # Create table if it doesn't exist (original columns)
             cursor.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {table_name} (
@@ -38,18 +37,27 @@ def init_db(db_path: pathlib.Path, table_name: str = "coffee_sales"):
                     Weekday TEXT,
                     Month_name TEXT,
                     Date TEXT,
-                    Time TEXT,
-                    coffee_name TEXT,
-                    sales REAL
+                    Time TEXT
                 )
                 """
             )
             conn.commit()
 
-        logger.info(f"Table '{table_name}' ready.")
+            # --- Add coffee_name column if it doesn't exist ---
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = [col[1] for col in cursor.fetchall()]
+            if "coffee_name" not in columns:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN coffee_name TEXT;")
+                conn.commit()
+                logger.info("Added column 'coffee_name' to coffee_sales")
+            # After adding coffee_name column
+            if "sales" not in columns:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN sales REAL;")
+                conn.commit()
+                logger.info("Added column 'sales' to coffee_sales")
+                logger.info(f"Table '{table_name}' ready.")
     except Exception as e:
         logger.error(f"Failed to initialize table '{table_name}': {e}")
-
 #####################################
 # Extract coffee name from message
 #####################################
@@ -63,26 +71,11 @@ def extract_coffee(message_text: str) -> str:
     return "Other"
 
 #####################################
-# Extract sale amount from message
-#####################################
-def extract_sales(message_text: str) -> float:
-    """
-    Extract the first numeric value in the message text.
-    """
-    if not message_text:
-        return 0.0
-    match = re.search(r"\b\d+(\.\d{1,2})?\b", message_text)
-    if match:
-        return float(match.group())
-    return 0.0
-
-#####################################
 # Insert Message into SQLite
 #####################################
 def insert_message(message: dict, db_path: pathlib.Path, table_name: str = "coffee_sales"):
     coffee_name = extract_coffee(message.get("message", ""))
-    sales_value = extract_sales(message.get("message", ""))
-
+    sales_value = message.get("money", 0)  # map money → sales, default 0 if missing
     try:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
@@ -114,7 +107,7 @@ def insert_message(message: dict, db_path: pathlib.Path, table_name: str = "coff
                 )
             )
             conn.commit()
-        logger.info(f"Inserted message: '{message.get('message')}' | coffee_name={coffee_name}, sales={sales_value}")
+        logger.info(f"Inserted message into '{table_name}': {message.get('message')} (coffee_name={coffee_name}, sales={sales_value})")
     except Exception as e:
         logger.error(f"Failed to insert message: {e}")
 
